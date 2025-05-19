@@ -1,4 +1,7 @@
-using CSV, DataFrames, CategoricalArrays, Statistics, GLM, MLJBase, MLJModels
+using CSV, DataFrames, CategoricalArrays, Statistics, GLM, MLJBase, MLJModels, Plots, StatsBase
+
+# Set plotting backend
+gr()  # Use GR backend for Plots.jl
 
 # ==================== BACA DAN PREPROSES DATA LATIH ====================
 
@@ -108,3 +111,49 @@ correct = sum(df_uji.predicted_label .== actual_label)
 accuracy = correct / nrow(df_uji) * 100
 
 println("\nAkurasi prediksi terhadap label asli data uji: $(round(accuracy, digits=2))%")
+
+# ==================== VISUALISASI HASIL ====================
+
+# 1. Confusion Matrix
+cm = countmap(zip(df_uji.predicted_label, actual_label))
+tn = get(cm, ("normal", "normal"), 0)
+fp = get(cm, ("normal", "anomaly"), 0)
+fn = get(cm, ("anomaly", "normal"), 0)
+tp = get(cm, ("anomaly", "anomaly"), 0)
+cm_matrix = [tn fp; fn tp]
+
+# Plot Confusion Matrix sebagai Heatmap
+p1 = heatmap(["Normal", "Anomaly"], ["Normal", "Anomaly"], cm_matrix,
+             title="Confusion Matrix",
+             xlabel="Predicted Label",
+             ylabel="Actual Label",
+             color=:blues,
+             clims=(0, maximum(cm_matrix)),
+             aspect_ratio=:equal,
+             size=(400, 400),
+             margin=5Plots.mm)
+
+# 2. Prediction Score Distribution
+normal_preds = df_uji.y_pred[df_uji.label_num .== 0.0]
+anomaly_preds = df_uji.y_pred[df_uji.label_num .== 1.0]
+bins = range(minimum(vcat(normal_preds, anomaly_preds)), maximum(vcat(normal_preds, anomaly_preds)), length=50)
+
+# Plot Histogram
+p2 = plot(
+    histogram(normal_preds, bins=bins, label="Normal", alpha=0.6, color=:blue),
+    histogram!(anomaly_preds, bins=bins, label="Anomaly", alpha=0.6, color=:red),
+    title="Prediction Score Distribution",
+    xlabel="Prediction Score",
+    ylabel="Count",
+    vline!([threshold], label="Threshold", color=:black, linestyle=:dash),
+    size=(600, 400),
+    margin=5Plots.mm
+)
+
+# Tampilkan plot
+display(p1)
+display(p2)
+
+# Opsional: Simpan plot ke file
+savefig(p1, "confusion_matrix.png")
+savefig(p2, "prediction_distribution.png")
